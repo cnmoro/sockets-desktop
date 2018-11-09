@@ -8,7 +8,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.util.Date;
 import java.util.Enumeration;
+import java.util.concurrent.*;
+import javax.persistence.EntityManager;
 
 /**
  *
@@ -18,11 +21,26 @@ public class MultiThreadedSockets {
 
     static String RASP_ADDRESS = "";
     static String LOCAL_ADDRESS = "";
+    static boolean RASP_FOUND = false;
     static final int PORT = 8089;
+    static double TEMPERATURE = -999;
+    static Semaphore SEMAFORO;
 
     public static void main(String[] args) {
+        //Inicializa o semáforo
+        SEMAFORO = new Semaphore(1);
+
+        //Thread 1 - Verificar novas mensagens do embarcado
         new socketServer().start();
+
+        //Encontrar Raspberry na rede DHCP
         getRaspAddr();
+
+        //Thread 2 - Persistir dados de temperatura no banco de dados relacional
+        new databaseHandler().start();
+
+        //Thread 3 - Enviar instrução de acionamento de componente
+        //Thread 4 - Enviar instrução de desativação de componente
     }
 
     public static String getLocalAddr() {
@@ -88,7 +106,7 @@ public class MultiThreadedSockets {
                 OutputStream output = socket.getOutputStream();
                 output.write("rasp?".getBytes());
             } catch (Exception e) {
-//                System.out.println("rasp not in " + ipAddr);
+//                System.out.println("Rasp não está em " + ipAddr);
             }
         }
     }
@@ -126,13 +144,61 @@ public class MultiThreadedSockets {
 
                             RASP_ADDRESS = addr;
                             System.out.println("Raspberry encontrado em " + RASP_ADDRESS);
+                            RASP_FOUND = true;
                         } else {
                             System.out.println("Recebido: " + msg);
+                            
+                            System.out.println("socketServer Deseja adquirir o semáforo");
+                            //Adquire o semáforo
+                            SEMAFORO.acquire();
+                            System.out.println("socketServer Adquiriu o semáforo");
+
+                            //Coloca o valor de temperatura recebido em uma variável
+                            TEMPERATURE = Double.parseDouble(msg);
+
+                            //Libera o semáforo 
+                            SEMAFORO.release();
+                            System.out.println("socketServer Liberou o semáforo");
                         }
                     }
                 }
             } catch (Exception e) {
+            }
+        }
+    }
 
+    static class databaseHandler extends Thread {
+
+        public databaseHandler() {
+        }
+
+        public void run() {
+            try {
+                while (true) {
+                    Thread.sleep(10);
+                    if (TEMPERATURE != -999) {
+                        System.out.println("databaseHandler Deseja adquirir o semáforo");
+                        //Adquire o semáforo
+                        SEMAFORO.acquire();
+
+                        System.out.println("databaseHandler Adquiriu o semáforo");
+
+                        //Grava o registro de temperatura no banco de dados
+                        EntityManager em = EManager.getEntityManager();
+                        em.getTransaction().begin();
+                        em.persist(new Log(TEMPERATURE, new Date()));
+                        em.getTransaction().commit();
+
+                        //Troca o valor da variável para -999, indicando que o valor foi lido e "limpo"
+                        TEMPERATURE = -999;
+
+                        //Libera o semáforo 
+                        SEMAFORO.release();
+                        System.out.println("databaseHandler Liberou o semáforo");
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
