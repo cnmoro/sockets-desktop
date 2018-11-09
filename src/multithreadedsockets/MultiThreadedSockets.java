@@ -270,7 +270,7 @@ public class MultiThreadedSockets {
             try {
                 while (true) {
                     Thread.sleep(10);
-                    if (SHOULD_DEACTIVATE_COOLER) {
+                    if (SHOULD_DEACTIVATE_COOLER && COOLER_STATUS_COUNT == 0) {
                         System.out.println("desativaCoolerHandler Deseja adquirir o semáforo");
                         //Adquire o semáforo
                         SEMAFORO.acquire();
