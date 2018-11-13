@@ -24,10 +24,10 @@ public class MultiThreadedSockets {
     static boolean RASP_FOUND = false;
     static final int PORT = 8089;
     static double TEMPERATURE = -999;
-    static final double HIGH_TEMP_THRESHOLD = 32;
+    static final double HIGH_TEMP_THRESHOLD = 33;
     static boolean SHOULD_ACTIVATE_COOLER = false;
     static boolean SHOULD_DEACTIVATE_COOLER = false;
-    static int COOLER_STATUS_COUNT = 0;
+//    static int COOLER_STATUS_COUNT = 0;
     static Semaphore SEMAFORO;
 
     public static void main(String[] args) {
@@ -38,7 +38,7 @@ public class MultiThreadedSockets {
         new socketServer().start();
 
         //Encontrar Raspberry na rede DHCP
-        getRaspAddr();
+        new raspAddrManager().start();
 
         //Thread 2 - Persistir dados de temperatura no banco de dados relacional
         new databaseHandler().start();
@@ -71,22 +71,35 @@ public class MultiThreadedSockets {
         return ip;
     }
 
-    public static void getRaspAddr() {
-        String localAddress = getLocalAddr();
-        LOCAL_ADDRESS = localAddress;
+    static class raspAddrManager extends Thread {
 
-        System.out.println("IP Local: " + localAddress);
-        String addrParts[] = localAddress.split("\\.");
+        public raspAddrManager() {
+        }
 
-        if (addrParts.length == 4) {
-            String addrProto = addrParts[0] + "." + addrParts[1] + "." + addrParts[2] + ".";
+        public void run() {
+            try {
+                while (RASP_FOUND == false) {
+                    String localAddress = getLocalAddr();
+                    LOCAL_ADDRESS = localAddress;
 
-            System.out.println("Procurando pelo raspberry na rede...");
+                    System.out.println("IP Local: " + localAddress + "\n");
+                    String addrParts[] = localAddress.split("\\.");
 
-            for (int i = 1; i <= 255; i++) {
-                if (!(addrProto + i).equals(LOCAL_ADDRESS)) {
-                    new raspSocketFinder(addrProto + i).start();
+                    if (addrParts.length == 4) {
+                        String addrProto = addrParts[0] + "." + addrParts[1] + "." + addrParts[2] + ".";
+
+                        System.out.println("Procurando pelo raspberry na rede...\n");
+
+                        for (int i = 1; i <= 255; i++) {
+                            if (!(addrProto + i).equals(LOCAL_ADDRESS)) {
+                                new raspSocketFinder(addrProto + i).start();
+                            }
+                        }
+                    }
+
+                    Thread.sleep(10000);
                 }
+            } catch (Exception e) {
             }
         }
     }
@@ -109,7 +122,7 @@ public class MultiThreadedSockets {
                 Thread.sleep(1000);
 
                 this.socket = new Socket(ipAddr, PORT);
-                System.out.println("Tentando " + ipAddr);
+                System.out.println("Tentando " + ipAddr + "\n");
                 OutputStream output = socket.getOutputStream();
                 output.write("rasp?".getBytes());
             } catch (Exception e) {
@@ -150,38 +163,52 @@ public class MultiThreadedSockets {
                             addr = addr.split("\\:")[0];
 
                             RASP_ADDRESS = addr;
-                            System.out.println("Raspberry encontrado em " + RASP_ADDRESS);
+                            System.out.println("Raspberry encontrado em " + RASP_ADDRESS + "\n");
                             RASP_FOUND = true;
                         } else {
                             System.out.println("Recebido: " + msg);
 
-                            System.out.println("socketServer Deseja adquirir o semáforo");
-                            //Adquire o semáforo
-                            SEMAFORO.acquire();
-                            System.out.println("socketServer Adquiriu o semáforo");
+                            double parsedTemp;
+                            boolean parseOk = true;
 
-                            //Coloca o valor de temperatura recebido em uma variável
-                            TEMPERATURE = Double.parseDouble(msg);
-
-                            if (TEMPERATURE >= HIGH_TEMP_THRESHOLD) {
-                                if (SHOULD_ACTIVATE_COOLER == false) {
-                                    SHOULD_ACTIVATE_COOLER = true;
-                                    COOLER_STATUS_COUNT = 1;
-                                }
-                            } else {
-                                if (SHOULD_DEACTIVATE_COOLER == false && COOLER_STATUS_COUNT == 1) {
-                                    SHOULD_DEACTIVATE_COOLER = true;
-                                    COOLER_STATUS_COUNT = 0;
-                                }
+                            try {
+                                parsedTemp = Double.parseDouble(msg);
+                            } catch (NumberFormatException nfe) {
+                                parsedTemp = -999;
+                                parseOk = false;
                             }
 
-                            //Libera o semáforo 
-                            SEMAFORO.release();
-                            System.out.println("socketServer Liberou o semáforo");
+                            if (parseOk) {
+                                System.out.println("socketServer Deseja adquirir o semáforo\n");
+
+                                //Adquire o semáforo
+                                SEMAFORO.acquire();
+                                System.out.println("socketServer Adquiriu o semáforo\n");
+
+                                //Coloca o valor de temperatura recebido em uma variável
+                                TEMPERATURE = parsedTemp;
+
+                                if (TEMPERATURE >= HIGH_TEMP_THRESHOLD) {
+//                                    if (SHOULD_ACTIVATE_COOLER == false) {
+                                    SHOULD_ACTIVATE_COOLER = true;
+//                                        COOLER_STATUS_COUNT = 1;
+//                                    }
+                                } else {
+//                                    if (SHOULD_DEACTIVATE_COOLER == false && COOLER_STATUS_COUNT == 1) {
+                                    SHOULD_DEACTIVATE_COOLER = true;
+//                                        COOLER_STATUS_COUNT = 0;
+//                                    }
+                                }
+
+                                //Libera o semáforo 
+                                SEMAFORO.release();
+                                System.out.println("socketServer Liberou o semáforo\n");
+                            }
                         }
                     }
                 }
             } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
@@ -196,11 +223,11 @@ public class MultiThreadedSockets {
                 while (true) {
                     Thread.sleep(10);
                     if (TEMPERATURE != -999) {
-                        System.out.println("databaseHandler Deseja adquirir o semáforo");
+                        System.out.println("databaseHandler Deseja adquirir o semáforo\n");
                         //Adquire o semáforo
                         SEMAFORO.acquire();
 
-                        System.out.println("databaseHandler Adquiriu o semáforo");
+                        System.out.println("databaseHandler Adquiriu o semáforo\n");
 
                         //Grava o registro de temperatura no banco de dados
                         EntityManager em = EManager.getEntityManager();
@@ -213,7 +240,7 @@ public class MultiThreadedSockets {
 
                         //Libera o semáforo 
                         SEMAFORO.release();
-                        System.out.println("databaseHandler Liberou o semáforo");
+                        System.out.println("databaseHandler Liberou o semáforo\n");
                     }
                 }
             } catch (Exception e) {
@@ -234,15 +261,15 @@ public class MultiThreadedSockets {
                 while (true) {
                     Thread.sleep(10);
                     if (SHOULD_ACTIVATE_COOLER) {
-                        System.out.println("acionaCoolerHandler Deseja adquirir o semáforo");
+                        System.out.println("acionaCoolerHandler Deseja adquirir o semáforo\n");
                         //Adquire o semáforo
                         SEMAFORO.acquire();
 
-                        System.out.println("acionaCoolerHandler Adquiriu o semáforo");
+                        System.out.println("acionaCoolerHandler Adquiriu o semáforo\n");
 
                         //Envia sinal de acionamento de cooler para o raspberry
                         this.socket = new Socket(RASP_ADDRESS, PORT);
-                        System.out.println("Enviando sinal de acionamento de cooler");
+                        System.out.println("Enviando sinal de acionamento de cooler\n");
                         OutputStream output = socket.getOutputStream();
                         output.write("acionarCooler".getBytes());
 
@@ -250,7 +277,7 @@ public class MultiThreadedSockets {
 
                         //Libera o semáforo 
                         SEMAFORO.release();
-                        System.out.println("acionaCoolerHandler Liberou o semáforo");
+                        System.out.println("acionaCoolerHandler Liberou o semáforo\n");
                     }
                 }
             } catch (Exception e) {
@@ -270,16 +297,17 @@ public class MultiThreadedSockets {
             try {
                 while (true) {
                     Thread.sleep(10);
-                    if (SHOULD_DEACTIVATE_COOLER && COOLER_STATUS_COUNT == 0) {
-                        System.out.println("desativaCoolerHandler Deseja adquirir o semáforo");
+//                    if (SHOULD_DEACTIVATE_COOLER && COOLER_STATUS_COUNT == 0) {
+                    if (SHOULD_DEACTIVATE_COOLER) {
+                        System.out.println("desativaCoolerHandler Deseja adquirir o semáforo\n");
                         //Adquire o semáforo
                         SEMAFORO.acquire();
 
-                        System.out.println("desativaCoolerHandler Adquiriu o semáforo");
+                        System.out.println("desativaCoolerHandler Adquiriu o semáforo\n");
 
                         //Envia sinal de desligamento de cooler para o raspberry
                         this.socket = new Socket(RASP_ADDRESS, PORT);
-                        System.out.println("Enviando sinal de desligamento de cooler");
+                        System.out.println("Enviando sinal de desligamento de cooler\n");
                         OutputStream output = socket.getOutputStream();
                         output.write("desligarCooler".getBytes());
 
@@ -287,7 +315,7 @@ public class MultiThreadedSockets {
 
                         //Libera o semáforo 
                         SEMAFORO.release();
-                        System.out.println("desativaCoolerHandler Liberou o semáforo");
+                        System.out.println("desativaCoolerHandler Liberou o semáforo\n");
                     }
                 }
             } catch (Exception e) {
