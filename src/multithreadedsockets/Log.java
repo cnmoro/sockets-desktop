@@ -39,6 +39,9 @@ public class Log implements Serializable {
     @Column(name = "temp")
     private double temp;
     @Basic(optional = false)
+    @Column(name = "umid")
+    private double umid;
+    @Basic(optional = false)
     @Column(name = "data")
     @Temporal(TemporalType.TIMESTAMP)
     private Date data;
@@ -50,14 +53,16 @@ public class Log implements Serializable {
         this.id = id;
     }
 
-    public Log(Integer id, double temp, Date data) {
+    public Log(Integer id, double temp, double umid, Date data) {
         this.id = id;
         this.temp = temp;
+        this.umid = umid;
         this.data = data;
     }
-    
-    public Log(double temp, Date data) {
+
+    public Log(double temp, double umid, Date data) {
         this.temp = temp;
+        this.umid = umid;
         this.data = data;
     }
 
@@ -75,6 +80,14 @@ public class Log implements Serializable {
 
     public void setTemp(double temp) {
         this.temp = temp;
+    }
+
+    public double getUmid() {
+        return umid;
+    }
+
+    public void setUmid(double umid) {
+        this.umid = umid;
     }
 
     public Date getData() {
@@ -109,5 +122,5 @@ public class Log implements Serializable {
     public String toString() {
         return "multithreadedsockets.Log[ id=" + id + " ]";
     }
-    
+
 }
