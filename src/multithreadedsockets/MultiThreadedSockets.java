@@ -199,15 +199,9 @@ public class MultiThreadedSockets {
                                     UMIDITY = parsedUmid;
 
                                     if (TEMPERATURE >= HIGH_TEMP_THRESHOLD) {
-//                                    if (SHOULD_ACTIVATE_COOLER == false) {
                                         SHOULD_ACTIVATE_COOLER = true;
-//                                        COOLER_STATUS_COUNT = 1;
-//                                    }
                                     } else {
-//                                    if (SHOULD_DEACTIVATE_COOLER == false && COOLER_STATUS_COUNT == 1) {
                                         SHOULD_DEACTIVATE_COOLER = true;
-//                                        COOLER_STATUS_COUNT = 0;
-//                                    }
                                     }
 
                                     //Libera o semáforo 
@@ -313,7 +307,6 @@ public class MultiThreadedSockets {
             try {
                 while (true) {
                     Thread.sleep(THREAD_SLEEP_ROUTINE_MS);
-//                    if (SHOULD_DEACTIVATE_COOLER && COOLER_STATUS_COUNT == 0) {
                     if (SHOULD_DEACTIVATE_COOLER) {
                         System.out.println("desativaCoolerHandler Deseja adquirir o semáforo\n");
                         //Adquire o semáforo
